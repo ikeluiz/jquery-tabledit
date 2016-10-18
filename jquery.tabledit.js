@@ -34,6 +34,7 @@ if (typeof jQuery === 'undefined') {
             mutedClass: 'text-muted',
             eventType: 'click',
             rowIdentifier: 'id',
+            ajaxDisable: false,
             hideIdentifier: false,
             autoFocus: true,
             editButton: true,
@@ -190,7 +191,7 @@ if (typeof jQuery === 'undefined') {
                                        </div></div>';
 
                         // Add toolbar column cells.
-                        $table.find('tbody>tr').append('<td style="white-space: nowrap; width: 1%;">' + toolbar + '</td>');
+                        $table.find('tr:gt(0)').append('<td style="white-space: nowrap; width: 1%;">' + toolbar + '</td>');
                     }
                 }
             }
@@ -369,49 +370,46 @@ if (typeof jQuery === 'undefined') {
          */
         function ajax(action)
         {
-            var serialize = $table.find('.tabledit-input').serialize()
+            if (!settings.ajaxDisable) {
+                var serialize = $table.find('.tabledit-input').serialize() + '&action=' + action;
 
-            if (!serialize) {
-                return false;
-            }
+                var result = settings.onAjax(action, serialize);
 
-            serialize += '&action=' + action;
-
-            var result = settings.onAjax(action, serialize);
-
-            if (result === false) {
-                return false;
-            }
-
-            var jqXHR = $.post(settings.url, serialize, function(data, textStatus, jqXHR) {
-                if (action === settings.buttons.edit.action) {
-                    $lastEditedRow.removeClass(settings.dangerClass).addClass(settings.warningClass);
-                    setTimeout(function() {
-                        //$lastEditedRow.removeClass(settings.warningClass);
-                        $table.find('tr.' + settings.warningClass).removeClass(settings.warningClass);
-                    }, 1400);
+                if (result === false) {
+                    return false;
                 }
 
-                settings.onSuccess(data, textStatus, jqXHR);
-            }, 'json');
+                var jqXHR = $.post(settings.url, serialize, function(data, textStatus, jqXHR) {
+                    if (action === settings.buttons.edit.action) {
+                        $lastEditedRow.removeClass(settings.dangerClass).addClass(settings.warningClass);
+                        setTimeout(function() {
+                            //$lastEditedRow.removeClass(settings.warningClass);
+                            $table.find('tr.' + settings.warningClass).removeClass(settings.warningClass);
+                        }, 1400);
+                    }
 
-            jqXHR.fail(function(jqXHR, textStatus, errorThrown) {
-                if (action === settings.buttons.delete.action) {
-                    $lastDeletedRow.removeClass(settings.mutedClass).addClass(settings.dangerClass);
-                    $lastDeletedRow.find('.tabledit-toolbar button').attr('disabled', false);
-                    $lastDeletedRow.find('.tabledit-toolbar .tabledit-restore-button').hide();
-                } else if (action === settings.buttons.edit.action) {
-                    $lastEditedRow.addClass(settings.dangerClass);
-                }
+                    settings.onSuccess(data, textStatus, jqXHR);
+                }, 'json');
 
-                settings.onFail(jqXHR, textStatus, errorThrown);
-            });
+                jqXHR.fail(function(jqXHR, textStatus, errorThrown) {
+                    if (action === settings.buttons.delete.action) {
+                        $lastDeletedRow.removeClass(settings.mutedClass).addClass(settings.dangerClass);
+                        $lastDeletedRow.find('.tabledit-toolbar button').attr('disabled', false);
+                        $lastDeletedRow.find('.tabledit-toolbar .tabledit-restore-button').hide();
+                    } else if (action === settings.buttons.edit.action) {
+                        $lastEditedRow.addClass(settings.dangerClass);
+                    }
 
-            jqXHR.always(function() {
-                settings.onAlways();
-            });
+                    settings.onFail(jqXHR, textStatus, errorThrown);
+                });
 
-            return jqXHR;
+                jqXHR.always(function() {
+                    settings.onAlways();
+                });
+
+                return jqXHR;
+
+            }
         }
 
         Draw.columns.identifier();
@@ -547,7 +545,7 @@ if (typeof jQuery === 'undefined') {
             /**
              * Change event when input is a select element.
              */
-            $table.on('change', 'select.tabledit-input:visible', function(event) {
+            $table.on('change', 'select.tabledit-input:visible', function() {
                 if (event.handled !== true) {
                     // Submit and update the column.
                     Edit.submit($(this).parent('td'));
@@ -604,6 +602,21 @@ if (typeof jQuery === 'undefined') {
                     Delete.reset($td);
                     break;
             }
+        });
+//--------------------------------_HACKCODE TO SAVE ON CLICK OUT WHEN CHANGE INPUT DATA --------------------
+        $(document).on("change", "input,select", function(event){   
+            var $input = $table.find('.tabledit-input:visible');
+            var $button = $table.find('.tabledit-confirm-button');
+
+            if ($input.length > 0) {
+                var $td = $input.parents('td');
+            } else if ($button.length > 0) {
+                var $td = $button.parents('td');
+            } else {
+                return;
+            }
+
+        	Edit.submit($td);
         });
 
         return this;
